@@ -58,9 +58,10 @@ fit1 %>% broom::tidy()
 
 ```{r}
 bw_df %>% 
-  modelr::add_residuals(fit1) %>% 
-  ggplot(aes(x = resid)) +
-  geom_density() 
+  add_residuals(fit1) %>% 
+  add_predictions(fit1) %>%  
+  ggplot(aes(x = pred, y = resid)) +
+  geom_point() 
 ```
 
 fit a model using length at birth and gestational age as predictors
@@ -121,4 +122,86 @@ cv_fit_df %>%
 ```
 
 ## Problem 2
+
+```{r}
+weather_df = 
+  rnoaa::meteo_pull_monitors(
+    c("USW00094728"),
+    var = c("PRCP", "TMIN", "TMAX"), 
+    date_min = "2017-01-01",
+    date_max = "2017-12-31") %>%
+  mutate(
+    name = recode(id, USW00094728 = "CentralPark_NY"),
+    tmin = tmin / 10,
+    tmax = tmax / 10) %>%
+  select(name, id, everything())
+```
+
+```{r}
+weather_bootstrap_results = 
+  weather_df %>% 
+  select(tmax, tmin) %>% 
+  bootstrap(n = 5000, id = "strap_number") %>%  #draw 10 samples with replacement have the same size as the filtered dataset
+  mutate(
+    models = map(.x = strap, ~lm(tmax ~ tmin, data = .x)),
+    results_coeff = map(models, broom::tidy),
+    results_rsquare = map(models, broom::glance)
+  ) %>% 
+  select(strap_number, results_coeff, results_rsquare) %>% 
+  unnest(results_coeff) %>% 
+  select(strap_number,term, estimate, std.error, results_rsquare) %>% 
+  unnest(results_rsquare) %>% 
+  select(strap_number, term, estimate, std.error, adj.r.squared)
+
+```
+
+```{r}
+beta0_df = 
+  weather_bootstrap_results %>% 
+  filter(term == "(Intercept)") %>% 
+  mutate(term = "beta0") %>%
+  select(strap_number, term, estimate, std.error)
+
+beta0_df %>% 
+  ggplot(aes(estimate)) +
+  geom_density()
+
+beta0_bar = mean(beta0_df$estimate)
+std = sd(beta0_df$estimate)
+cbind(CIlower = beta0_bar - 1.96 * 5 / 10, CIupper = beta0_bar + 1.96 * 5 / 10)
+```
+
+```{r}
+beta1_df = 
+  weather_bootstrap_results %>% 
+  filter(term == "tmin") %>% 
+  mutate(term = "beta1") %>% 
+  select(strap_number, term, estimate)
+
+beta1_df %>% 
+  ggplot(aes(estimate)) +
+  geom_density()
+
+
+```
+
+```{r}
+adj_rsquare_df = 
+  weather_bootstrap_results %>% 
+  select(strap_number, adj.r.squared) %>% 
+  distinct(strap_number, .keep_all = TRUE)
+
+adj_rsquare_df %>% 
+  ggplot(aes(adj.r.squared)) +
+  geom_density()
+```
+
+```{r}
+fit_weather = lm(tmax ~ tmin, data = weather_df)
+
+summary(fit_weather)
+
+fit_weather %>% broom::glance()
+fit_weather %>% broom::tidy()
+```
 

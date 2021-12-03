@@ -5,7 +5,7 @@ date: "12/1/2021"
 output: github_document
 ---
 
-```{r, messages = FALSE, warning=FALSE}
+```{r, message = FALSE, warning=FALSE}
 library(tidyverse)
 library(readr)
 library(modelr)
@@ -15,7 +15,7 @@ library(patchwork)
 ## Problem 1
 
 Load and clean data
-```{r}
+```{r, message=FALSE}
 bw_df = 
   read_csv("./data/birthweight.csv") %>% 
   mutate(babysex = factor(babysex),

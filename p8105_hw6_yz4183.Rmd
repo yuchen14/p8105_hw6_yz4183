@@ -1,0 +1,124 @@
+---
+title: "P8105 HW6"
+author: "Yuchen Zheng"
+date: "12/1/2021"
+output: github_document
+---
+
+```{r}
+library(tidyverse)
+library(readr)
+library(modelr)
+```
+
+## Problem 1
+
+Load and clean data
+```{r}
+bw_df = 
+  read_csv("./data/birthweight.csv") %>% 
+  mutate(babysex = factor(babysex),
+         frace = factor(frace),
+         malform = factor(malform),
+         mrace = factor(mrace)) 
+
+bw_df %>% skimr::skim()
+```
+
+I want to see if there is a relationship between mother's pre-pregnancy weight and baby's birth weight and mother's weight gain during pregnancy and baby's birth weight by plotting scatterplots.
+```{r}
+bw_df %>% 
+  select(bwt,wtgain, ppwt) %>% 
+  pairs()
+
+bw_df %>% 
+  ggplot(aes(x = wtgain, y = bwt)) +
+  geom_point()
+
+bw_df %>% 
+  ggplot(aes(x = ppwt, y = bwt)) +
+  geom_point()
+
+bw_df %>% 
+  ggplot(aes(x = delwt, y = bwt)) +
+  geom_point()
+
+bw_df %>% 
+  ggplot(aes(x = mheight, y = bwt)) +
+  geom_point()
+```
+
+fit a model using mother's pre-pregnancy weight and mother's weight gain during pregnancy
+```{r}
+fit1 = lm(bwt ~ ppwt + wtgain + mheight, data  = bw_df)
+
+fit1 %>% broom::tidy()
+
+```
+
+```{r}
+bw_df %>% 
+  modelr::add_residuals(fit1) %>% 
+  ggplot(aes(x = resid)) +
+  geom_density() 
+```
+
+fit a model using length at birth and gestational age as predictors
+```{r}
+fit2 = lm(bwt ~ blength + gaweeks, data = bw_df)
+
+fit2 %>% broom::tidy()
+
+bw_df %>% 
+  modelr::add_residuals(fit2) %>% 
+  ggplot(aes(x = resid)) +
+  geom_density() 
+```
+
+fit a model using head circumference, length, sex and all interactions
+```{r}
+fit3 = lm(bwt ~ bhead + blength + babysex + bhead*blength + bhead*babysex + blength*babysex + bhead*blength*babysex, data = bw_df)
+
+fit3 %>% broom::tidy()
+
+bw_df %>% 
+  modelr::add_residuals(fit3) %>% 
+  ggplot(aes(x = resid)) +
+  geom_density() 
+```
+
+```{r}
+cv_df = 
+  crossv_mc(bw_df, 100) %>% 
+  mutate(
+    train = map(train, as_tibble),
+    test = map(test, as_tibble)
+  )
+
+cv_fit_df=
+  cv_df %>% 
+  mutate(
+    fit1 = map(.x = train, ~lm(bwt ~ ppwt + wtgain + mheight, data  = .x)),
+    fit2 = map(.x = train, ~lm(bwt ~ blength + gaweeks, data = .x)),
+    fit3 = map(.x = train, ~lm(bwt ~ bhead + blength + babysex + bhead*blength + bhead*babysex + blength*babysex + bhead*blength*babysex, data = .x))
+  ) %>% 
+  mutate(
+    rmse_fit1 = map2_dbl(.x = fit1, .y = test, ~rmse(model = .x, data = .y)),
+    rmse_fit2 = map2_dbl(.x = fit2, .y = test, ~rmse(model = .x, data = .y)),
+    rmse_fit3 = map2_dbl(.x = fit3, .y = test, ~rmse(model = .x, data = .y)),
+  )
+
+cv_fit_df %>% 
+  select(starts_with("rmse")) %>% 
+  pivot_longer(
+    everything(),
+    names_to = "model",
+    values_to = "rmse",
+    names_prefix = "rmse"
+  ) %>% 
+  ggplot(aes(x = model, y = rmse)) +
+  geom_boxplot()
+```
+
+## Problem 2
+

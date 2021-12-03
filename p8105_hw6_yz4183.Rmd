@@ -5,10 +5,11 @@ date: "12/1/2021"
 output: github_document
 ---
 
-```{r}
+```{r, messages = FALSE, warning=FALSE}
 library(tidyverse)
 library(readr)
 library(modelr)
+library(patchwork)
 ```
 
 ## Problem 1
@@ -20,73 +21,119 @@ bw_df =
   mutate(babysex = factor(babysex),
          frace = factor(frace),
          malform = factor(malform),
-         mrace = factor(mrace)) 
+         mrace = factor(mrace)) %>% 
+  mutate(bwt = bwt*0.00220462)
 
 bw_df %>% skimr::skim()
 ```
 
-I want to see if there is a relationship between mother's pre-pregnancy weight and baby's birth weight and mother's weight gain during pregnancy and baby's birth weight by plotting scatterplots.
-```{r}
-bw_df %>% 
-  select(bwt,wtgain, ppwt) %>% 
-  pairs()
+There is no missing values in this dataset. There are four categorical variables: babysex, frace, marace and malform. The rest of the variables are numeric variables. 
 
-bw_df %>% 
+I made a few plots to see the relationships between the response variable baby's birth weight and some numeric variables in the dataset. 
+```{r, fig.height = 6, fig.width = 10 }
+
+p1 = 
+  bw_df %>% 
+  ggplot(aes(x = bhead, y = bwt)) +
+  geom_point()
+
+p2 = 
+  bw_df %>% 
+  ggplot(aes(x = blength, y = bwt)) +
+  geom_point()
+
+p3 = 
+  bw_df %>% 
   ggplot(aes(x = wtgain, y = bwt)) +
   geom_point()
 
-bw_df %>% 
+p4 = 
+  bw_df %>% 
   ggplot(aes(x = ppwt, y = bwt)) +
   geom_point()
 
-bw_df %>% 
+p5 =
+  bw_df %>% 
   ggplot(aes(x = delwt, y = bwt)) +
   geom_point()
 
-bw_df %>% 
+p6 =
+  bw_df %>% 
   ggplot(aes(x = mheight, y = bwt)) +
   geom_point()
+
+p1 + p2 + p3 + p4 + p5 + p6
 ```
 
-fit a model using mother's pre-pregnancy weight and mother's weight gain during pregnancy
-```{r}
-fit1 = lm(bwt ~ ppwt + wtgain + mheight, data  = bw_df)
+From this plot, we can see that there could be a linear relationship between varaible bhead and bwt and between blength and bwt. For other variables, wtgain, ppwt, delwt and mheight, there are no visible linear relationships between the each of them and the response variable. 
 
-fit1 %>% broom::tidy()
+I also made four boxplots to see the distributions of baby's birth weight by the four categorical variables.
 
+```{r, fig.height = 6, fig.width = 10}
+p5 = 
+  bw_df %>% 
+  ggplot(aes(x = babysex, y = bwt)) +
+  geom_boxplot()
+
+p6 = 
+  bw_df %>% 
+  ggplot(aes(x = frace, y = bwt)) +
+  geom_boxplot()
+
+p7 = 
+  bw_df %>% 
+  ggplot(aes(x = mrace, y = bwt)) +
+  geom_boxplot()
+
+p8 = 
+  bw_df %>% 
+  ggplot(aes(x = malform, y = bwt)) +
+  geom_boxplot()
+
+p5 + p6 + p7 + p8
 ```
 
+From these plots, we can see the distributions of baby's birth weight among different levels in each categorical seems to be similar. 
+
+Since from the plots, it's not obvious which predictors have a linear relationship with the response variable, I chose to perform a forward stepwise model selection by AIC to fit my linear model. 
+
+```{r, warning=FALSE}
+full_model = ~bwt + babysex + bhead + blength + delwt + fincome + frace + gaweeks + malform + menarche + mheight + momage + mrace + parity + pnumlbw + pnumsga + ppbmi + ppwt + smoken + wtgain
+
+base_model = lm(bwt ~ babysex, data = bw_df)
+
+model_forward = step(base_model, full_model, direction = 'forward')
+model_forward
+```
+
+The model chosen by stepwise forward selection by AIC is:
+lm(formula = bwt ~ babysex + bhead + blength + mrace + delwt + gaweeks + smoken + ppbmi + parity + ppwt + fincome, data = bw_df)  
+
+Next, I made a plot of model residuals against fitted values. 
 ```{r}
 bw_df %>% 
-  add_residuals(fit1) %>% 
-  add_predictions(fit1) %>%  
+  add_residuals(model_forward) %>% 
+  add_predictions(model_forward) %>%  
   ggplot(aes(x = pred, y = resid)) +
   geom_point() 
 ```
 
-fit a model using length at birth and gestational age as predictors
+    
+Fit a model using length at birth and gestational age as predictors
 ```{r}
-fit2 = lm(bwt ~ blength + gaweeks, data = bw_df)
+main_eff_mod = lm(bwt ~ blength + gaweeks, data = bw_df)
 
-fit2 %>% broom::tidy()
-
-bw_df %>% 
-  modelr::add_residuals(fit2) %>% 
-  ggplot(aes(x = resid)) +
-  geom_density() 
+main_eff_mod %>% broom::tidy()
 ```
 
-fit a model using head circumference, length, sex and all interactions
+Fit a model using head circumference, length, sex and all interactions
 ```{r}
-fit3 = lm(bwt ~ bhead + blength + babysex + bhead*blength + bhead*babysex + blength*babysex + bhead*blength*babysex, data = bw_df)
+interc_mod = lm(bwt ~ bhead + blength + babysex + bhead*blength + bhead*babysex + blength*babysex + bhead*blength*babysex, data = bw_df)
 
-fit3 %>% broom::tidy()
-
-bw_df %>% 
-  modelr::add_residuals(fit3) %>% 
-  ggplot(aes(x = resid)) +
-  geom_density() 
+interc_mod %>% broom::tidy()
 ```
+
+Compare my model to a main effect model with length at birth and gestational age as predictors and a model with head circumference, length, sex, and all interactions as predictors.  
 
 ```{r}
 cv_df = 
@@ -99,14 +146,15 @@ cv_df =
 cv_fit_df=
   cv_df %>% 
   mutate(
-    fit1 = map(.x = train, ~lm(bwt ~ ppwt + wtgain + mheight, data  = .x)),
-    fit2 = map(.x = train, ~lm(bwt ~ blength + gaweeks, data = .x)),
-    fit3 = map(.x = train, ~lm(bwt ~ bhead + blength + babysex + bhead*blength + bhead*babysex + blength*babysex + bhead*blength*babysex, data = .x))
+    model_forward = map(.x = train, ~lm(bwt ~ babysex + bhead + blength + mrace + delwt + 
+    gaweeks + smoken + ppbmi + parity + ppwt + fincome, data  = .x)),
+    main_eff_mod = map(.x = train, ~lm(bwt ~ blength + gaweeks, data = .x)),
+    interc_mod = map(.x = train, ~lm(bwt ~ bhead + blength + babysex + bhead*blength + bhead*babysex + blength*babysex + bhead*blength*babysex, data = .x))
   ) %>% 
   mutate(
-    rmse_fit1 = map2_dbl(.x = fit1, .y = test, ~rmse(model = .x, data = .y)),
-    rmse_fit2 = map2_dbl(.x = fit2, .y = test, ~rmse(model = .x, data = .y)),
-    rmse_fit3 = map2_dbl(.x = fit3, .y = test, ~rmse(model = .x, data = .y)),
+    rmse_model_forward = map2_dbl(.x = model_forward, .y = test, ~rmse(model = .x, data = .y)),
+    rmse_main_eff_mod = map2_dbl(.x = main_eff_mod, .y = test, ~rmse(model = .x, data = .y)),
+    rmse_interc_mod = map2_dbl(.x = interc_mod, .y = test, ~rmse(model = .x, data = .y)),
   )
 
 cv_fit_df %>% 
@@ -115,7 +163,7 @@ cv_fit_df %>%
     everything(),
     names_to = "model",
     values_to = "rmse",
-    names_prefix = "rmse"
+    names_prefix = "rmse_"
   ) %>% 
   ggplot(aes(x = model, y = rmse)) +
   geom_boxplot()
@@ -123,6 +171,7 @@ cv_fit_df %>%
 
 ## Problem 2
 
+Read the dataset
 ```{r}
 weather_df = 
   rnoaa::meteo_pull_monitors(
@@ -134,8 +183,10 @@ weather_df =
     name = recode(id, USW00094728 = "CentralPark_NY"),
     tmin = tmin / 10,
     tmax = tmax / 10) %>%
-  select(name, id, everything())
+  select(name,id, everything())
 ```
+
+Use 5000 bootstrap samples and for each sample produce estimates of adjusted $\hat{r^2}$ and log($\hat\beta_0$ * $\hat\beta_1$)
 
 ```{r}
 weather_bootstrap_results = 
@@ -149,59 +200,62 @@ weather_bootstrap_results =
   ) %>% 
   select(strap_number, results_coeff, results_rsquare) %>% 
   unnest(results_coeff) %>% 
-  select(strap_number,term, estimate, std.error, results_rsquare) %>% 
+  select(strap_number,term, estimate, results_rsquare) %>% 
   unnest(results_rsquare) %>% 
-  select(strap_number, term, estimate, std.error, adj.r.squared)
+  select(strap_number, term, estimate, r.squared)
 
 ```
+
 
 ```{r}
 beta0_df = 
   weather_bootstrap_results %>% 
   filter(term == "(Intercept)") %>% 
-  mutate(term = "beta0") %>%
-  select(strap_number, term, estimate, std.error)
+  select(strap_number, estimate) %>% 
+  rename(beta0 = estimate)
 
-beta0_df %>% 
-  ggplot(aes(estimate)) +
-  geom_density()
 
-beta0_bar = mean(beta0_df$estimate)
-std = sd(beta0_df$estimate)
-cbind(CIlower = beta0_bar - 1.96 * 5 / 10, CIupper = beta0_bar + 1.96 * 5 / 10)
-```
-
-```{r}
 beta1_df = 
   weather_bootstrap_results %>% 
-  filter(term == "tmin") %>% 
-  mutate(term = "beta1") %>% 
-  select(strap_number, term, estimate)
+  filter(term == "tmin") %>%
+  select(strap_number,estimate) %>% 
+  rename(beta1 = estimate)
 
-beta1_df %>% 
-  ggplot(aes(estimate)) +
+betas_df = 
+  inner_join(beta0_df, beta1_df, by = "strap_number") %>% 
+  mutate(log_beta = log(beta0*beta1))
+
+betas_df %>% 
+  ggplot(aes(log_beta)) +
   geom_density()
-
-
 ```
 
+The distribution of log($\hat\beta_0$ * $\hat\beta_1$) seems to be somewhat left-skewed. 
+
 ```{r}
-adj_rsquare_df = 
+quantile(betas_df$log_beta, c(.025, 0.975)) 
+```
+
+The 95% confidence interal for log($\hat\beta_0$ * $\hat\beta_1$) is (1.96, 2.05).
+
+```{r}
+rsquare_df = 
   weather_bootstrap_results %>% 
-  select(strap_number, adj.r.squared) %>% 
+  select(strap_number, r.squared) %>% 
   distinct(strap_number, .keep_all = TRUE)
 
-adj_rsquare_df %>% 
-  ggplot(aes(adj.r.squared)) +
+rsquare_df %>% 
+  ggplot(aes(r.squared)) +
   geom_density()
 ```
 
+The distribution of $\hat{r^2}$ seems to be somewhat left-skewed. 
+
 ```{r}
-fit_weather = lm(tmax ~ tmin, data = weather_df)
-
-summary(fit_weather)
-
-fit_weather %>% broom::glance()
-fit_weather %>% broom::tidy()
+quantile(rsquare_df$r.squared, c(.025, 0.975)) 
 ```
+
+The 95% confidence interal for $\hat{r^2}$ is (0.89, 0.92).
+
+
 

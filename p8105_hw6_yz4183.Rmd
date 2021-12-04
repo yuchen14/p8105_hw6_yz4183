@@ -67,7 +67,7 @@ p1 + p2 + p3 + p4 + p5 + p6
 
 From this plot, we can see that there could be a linear relationship between varaible bhead and bwt and between blength and bwt. For other variables, wtgain, ppwt, delwt and mheight, there are no visible linear relationships between the each of them and the response variable. 
 
-I also made four boxplots to see the distributions of baby's birth weight by the four categorical variables.
+I also made four boxplots to see the distributions of baby's birth weight among each levels in the four categorical variables.
 
 ```{r, fig.height = 6, fig.width = 10}
 p5 = 
@@ -95,7 +95,7 @@ p5 + p6 + p7 + p8
 
 From these plots, we can see the distributions of baby's birth weight among different levels in each categorical seems to be similar. 
 
-Since from the plots, it's not obvious which predictors have a linear relationship with the response variable, I chose to perform a forward stepwise model selection by AIC to fit my linear model. 
+Since from the plots it's not obvious which predictors have a linear relationship with the response variable, I chose to perform a forward stepwise model selection by AIC to fit my linear model. 
 
 ```{r, warning=FALSE}
 full_model = ~bwt + babysex + bhead + blength + delwt + fincome + frace + gaweeks + malform + menarche + mheight + momage + mrace + parity + pnumlbw + pnumsga + ppbmi + ppwt + smoken + wtgain
@@ -186,7 +186,7 @@ weather_df =
   select(name,id, everything())
 ```
 
-Use 5000 bootstrap samples and for each sample produce estimates of adjusted $\hat{r^2}$ and log($\hat\beta_0$ * $\hat\beta_1$)
+Use 5000 bootstrap samples and for each sample produce estimates of $\hat{r^2}$ and log($\hat\beta_0$ * $\hat\beta_1$)
 
 ```{r}
 weather_bootstrap_results = 

@@ -192,7 +192,7 @@ Use 5000 bootstrap samples and for each sample produce estimates of $\hat{r^2}$ 
 weather_bootstrap_results = 
   weather_df %>% 
   select(tmax, tmin) %>% 
-  bootstrap(n = 5000, id = "strap_number") %>%  #draw 10 samples with replacement have the same size as the filtered dataset
+  bootstrap(n = 5000, id = "strap_number") %>%
   mutate(
     models = map(.x = strap, ~lm(tmax ~ tmin, data = .x)),
     results_coeff = map(models, broom::tidy),
